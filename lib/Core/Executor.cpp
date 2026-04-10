@@ -519,6 +519,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
       pathWriter(0), symPathWriter(0), specialFunctionHandler(0), timers{time::Span(TimerInterval)},
       replayKTest(0), replayPath(0), usingSeeds(0),
       atMemoryLimit(false), inhibitForking(false), haltExecution(false),
+      executionStartTime(time::getWallTime()), firstBugTimeReported(false),
       ivcEnabled(false), debugLogBuffer(debugBufferString) {
 
 
@@ -3951,6 +3952,20 @@ void Executor::terminateStateOnError(ExecutionState &state,
   static std::set< std::pair<Instruction*, std::string> > emittedErrors;
   Instruction * lastInst;
   const InstructionInfo &ii = getLastNonKleeInternalInstruction(state, &lastInst);
+
+  if (!firstBugTimeReported) {
+    const time::Span elapsed =
+        statsTracker ? statsTracker->elapsed()
+                     : (time::getWallTime() - executionStartTime);
+  
+    std::ostringstream elapsedStream;
+    elapsedStream << std::fixed << std::setprecision(3)
+                  << elapsed.toSeconds() << 's';
+    const std::string elapsedString = elapsedStream.str();
+  
+    klee_message("First bug found after %s", elapsedString.c_str());
+    firstBugTimeReported = true;
+  }
 
   if (EmitAllErrors ||
       emittedErrors.insert(std::make_pair(lastInst, message)).second) {

@@ -175,6 +175,12 @@ private:
   /// step.
   bool haltExecution;  
 
+  /// Wall-clock time when this executor started running.
+  time::Point executionStartTime;
+
+  /// Ensure the first-bug timing message is emitted only once per run.
+  bool firstBugTimeReported;
+
   /// Whether implied-value concretization is enabled. Currently
   /// false, it is buggy (it needs to validate its writes).
   bool ivcEnabled;

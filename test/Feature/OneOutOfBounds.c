@@ -6,6 +6,7 @@
 
 int main() {
   int *x = malloc(sizeof(int));
+  // CHECK: KLEE: First bug found after {{[0-9]+(\.[0-9]+)?s}}
   // CHECK: OneOutOfBounds.c:[[@LINE+1]]: memory error: out of bound pointer
   x[1] = 1;
   free(x);
