@@ -1,0 +1,7 @@
+array x[4] : w32 -> w8 = symbolic
+(query [(Slt 0
+              N0:(ReadLSB w32 0 x))
+         (Slt 10 N0)
+         (Slt 20 N0)
+         (Slt 30 N0)]
+        false)

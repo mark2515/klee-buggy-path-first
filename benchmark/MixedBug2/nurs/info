@@ -1,0 +1,20 @@
+klee --search=nurs:covnew --output-dir=nurs MixedBug2.bc
+PID: 13757
+Using monotonic steady clock with 1/1000000000s resolution
+Started: 2026-04-10 09:49:55
+BEGIN searcher description
+WeightedRandomSearcher::CoveringNew
+END searcher description
+Finished: 2026-04-10 09:50:46
+Elapsed: 00:00:51
+KLEE: done: explored paths = 70
+KLEE: done: avg. constructs per query = 211
+KLEE: done: total queries = 842
+KLEE: done: valid queries = 680
+KLEE: done: invalid queries = 162
+KLEE: done: query cex = 842
+
+KLEE: done: total instructions = 822
+KLEE: done: completed paths = 60
+KLEE: done: partially completed paths = 10
+KLEE: done: generated tests = 61

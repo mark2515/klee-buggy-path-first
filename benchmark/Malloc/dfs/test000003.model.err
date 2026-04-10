@@ -1,0 +1,8 @@
+Error: concretized symbolic size
+Stack: 
+	#000000029 in main()
+Info: 
+  size expr: (Mul w64 4
+                       (SExt w64 (ReadLSB w32 0 n)))
+  concretization : 4
+  unbound example: 8
