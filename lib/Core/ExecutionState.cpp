@@ -82,6 +82,7 @@ ExecutionState::ExecutionState(KFunction *kf, MemoryManager *mm)
     stackAllocator = mm->stackFactory.makeAllocator();
     heapAllocator = mm->heapFactory.makeAllocator();
   }
+  refreshRiskScore();
 }
 
 ExecutionState::~ExecutionState() {
@@ -117,7 +118,12 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     coveredNew(state.coveredNew),
     forkDisabled(state.forkDisabled),
     base_addrs(state.base_addrs),
-    base_mos(state.base_mos) {
+    base_mos(state.base_mos),
+    riskScore(state.riskScore),
+    symbolicMemoryAccesses(state.symbolicMemoryAccesses),
+    symbolicPointerUses(state.symbolicPointerUses),
+    complexBranchScore(state.complexBranchScore),
+    memoryErrorEvents(state.memoryErrorEvents) {
   for (const auto &cur_mergehandler: openMergeStack)
     cur_mergehandler->addOpenState(this);
 }
@@ -396,3 +402,33 @@ void ExecutionState::addConstraint(ref<Expr> e) {
 void ExecutionState::addCexPreference(const ref<Expr> &cond) {
   cexPreferences = cexPreferences.insert(cond);
 }
+
+void ExecutionState::noteSymbolicMemoryAccess() {
+  ++symbolicMemoryAccesses;
+  refreshRiskScore();
+}
+
+void ExecutionState::noteSymbolicPointerUse() {
+  ++symbolicPointerUses;
+  refreshRiskScore();
+}
+
+void ExecutionState::noteComplexBranch(std::uint64_t complexity) {
+  complexBranchScore += complexity;
+  refreshRiskScore();
+}
+
+void ExecutionState::noteMemoryError() {
+  ++memoryErrorEvents;
+  refreshRiskScore();
+}
+
+double ExecutionState::computeRiskScore() const {
+  // Favor states that repeatedly interact with symbolic memory and pointers,
+  // while still slightly biasing toward deeper paths.
+  return 20.0 * symbolicMemoryAccesses + 30.0 * symbolicPointerUses +
+         2.0 * complexBranchScore + 100.0 * memoryErrorEvents +
+         static_cast<double>(depth);
+}
+
+void ExecutionState::refreshRiskScore() { riskScore = computeRiskScore(); }

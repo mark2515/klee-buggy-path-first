@@ -255,6 +255,13 @@ public:
   using base_mo_t = std::map<uint64_t, std::set<ref<Expr>>>;
   base_mo_t base_mos;
 
+  /// @brief Heuristic metadata for risk-based search strategies.
+  double riskScore = 0.0;
+  std::uint64_t symbolicMemoryAccesses = 0;
+  std::uint64_t symbolicPointerUses = 0;
+  std::uint64_t complexBranchScore = 0;
+  std::uint64_t memoryErrorEvents = 0;
+
 public:
 #ifdef KLEE_UNITTEST
   // provide this function only in the context of unittests
@@ -282,6 +289,14 @@ public:
 
   void addConstraint(ref<Expr> e);
   void addCexPreference(const ref<Expr> &cond);
+
+  void noteSymbolicMemoryAccess();
+  void noteSymbolicPointerUse();
+  void noteComplexBranch(std::uint64_t complexity);
+  void noteMemoryError();
+  double computeRiskScore() const;
+  void refreshRiskScore();
+  double getRiskScore() const { return riskScore; }
 
   bool merge(const ExecutionState &b);
   void dumpStack(llvm::raw_ostream &out) const;

@@ -21,6 +21,7 @@
 #include <map>
 #include <queue>
 #include <set>
+#include <unordered_map>
 #include <vector>
 
 namespace llvm {
@@ -65,6 +66,7 @@ namespace klee {
       BFS,
       RandomState,
       RandomPath,
+      BuggyPathFirst,
       NURS_CovNew,
       NURS_MD2U,
       NURS_Depth,
@@ -113,6 +115,39 @@ namespace klee {
 
   public:
     explicit RandomSearcher(RNG &rng);
+    ExecutionState &selectState() override;
+    void update(ExecutionState *current,
+                const std::vector<ExecutionState *> &addedStates,
+                const std::vector<ExecutionState *> &removedStates) override;
+    bool empty() override;
+    void printName(llvm::raw_ostream &os) override;
+  };
+
+  /// BuggyPathFirstSearcher prioritizes states with higher risk scores.
+  class BuggyPathFirstSearcher final : public Searcher {
+    struct QueueEntry {
+      double riskScore;
+      std::uint64_t generation;
+      ExecutionState *state;
+    };
+
+    struct QueueEntryCompare {
+      bool operator()(const QueueEntry &lhs, const QueueEntry &rhs) const {
+        if (lhs.riskScore != rhs.riskScore)
+          return lhs.riskScore < rhs.riskScore;
+        return lhs.state->getID() > rhs.state->getID();
+      }
+    };
+
+    std::priority_queue<QueueEntry, std::vector<QueueEntry>, QueueEntryCompare>
+        states;
+    std::set<ExecutionState *> activeStates;
+    std::unordered_map<ExecutionState *, std::uint64_t> generations;
+
+    void pushOrRefresh(ExecutionState &state);
+    void discardStaleEntries();
+
+  public:
     ExecutionState &selectState() override;
     void update(ExecutionState *current,
                 const std::vector<ExecutionState *> &addedStates,
