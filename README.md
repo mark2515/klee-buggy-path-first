@@ -1,27 +1,52 @@
-KLEE Symbolic Virtual Machine
-=============================
+# KLEE Buggy Path First
 
-[![Build Status](https://github.com/klee/klee/workflows/CI/badge.svg)](https://github.com/klee/klee/actions?query=workflow%3ACI)
-[![Build Status](https://api.cirrus-ci.com/github/klee/klee.svg)](https://cirrus-ci.com/github/klee/klee)
-[![Coverage](https://codecov.io/gh/klee/klee/branch/master/graph/badge.svg)](https://codecov.io/gh/klee/klee)
+This project adds a custom KLEE search strategy: `buggy-path-first`.
 
-`KLEE` is a symbolic virtual machine built on top of the LLVM compiler
-infrastructure. Currently, there are two primary components:
+## Available Scripts
 
-  1. The core symbolic virtual machine engine; this is responsible for
-     executing LLVM bitcode modules with support for symbolic
-     values. This is comprised of the code in lib/.
+1. Start the KLEE Docker container.
 
-  2. A POSIX/Linux emulation layer oriented towards supporting uClibc,
-     with additional support for making parts of the operating system
-     environment symbolic.
+```bash
+docker run -ti --platform linux/amd64 -v <host_parent_dir>:/workspace klee/klee
+```
 
-Additionally, there is a simple library for replaying computed inputs
-on native code (for closed programs). There is also a more complicated
-infrastructure for replaying the inputs generated for the POSIX/Linux
-emulation layer, which handles running native programs in an
-environment that matches a computed test input, including setting up
-files, pipes, environment variables, and passing command line
-arguments.
+`<host_parent_dir>` is the folder on your machine that contains this repo.
+Inside Docker, this repo will usually be available at:
 
-For further information, see the [webpage](https://klee-se.org/).
+```bash
+/workspace/klee-buggy-path-first
+```
+
+2. Copy this project's core files into the KLEE source tree and rebuild KLEE.
+
+```bash
+cp /workspace/klee-buggy-path-first/lib/Core/* /tmp/klee_src/lib/Core/
+cd /home/klee/klee_build
+make -j$(nproc)
+```
+
+3. Go to a benchmark folder and compile the `.c` file to LLVM bitcode.
+
+```bash
+cd /workspace/klee-buggy-path-first/benchmark/<BenchmarkName>
+clang -I /home/klee/klee_src/include -emit-llvm -c <BenchmarkName>.c -o <BenchmarkName>.bc
+```
+
+Examples of benchmark names: `MixedBug`, `DeepBug`, `DivCheck`, `Malloc`.
+
+4. Run KLEE with different search strategies.
+
+```bash
+klee --search=dfs --output-dir=dfs <BenchmarkName>.bc
+klee --search=random-path --output-dir=random-path <BenchmarkName>.bc
+klee --search=nurs:covnew --output-dir=nurs <BenchmarkName>.bc
+klee --search=buggy-path-first --output-dir=buggy-path-first <BenchmarkName>.bc
+```
+
+## Example
+
+```bash
+cd /workspace/klee-buggy-path-first/benchmark/MixedBug
+clang -I /home/klee/klee_src/include -emit-llvm -c MixedBug.c -o MixedBug.bc
+klee --search=buggy-path-first --output-dir=buggy-path-first MixedBug.bc
+```
