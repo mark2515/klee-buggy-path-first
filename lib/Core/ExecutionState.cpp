@@ -424,8 +424,6 @@ void ExecutionState::noteMemoryError() {
 }
 
 double ExecutionState::computeRiskScore() const {
-  // Favor states that repeatedly interact with symbolic memory and pointers,
-  // while still slightly biasing toward deeper paths.
   return 20.0 * symbolicMemoryAccesses + 30.0 * symbolicPointerUses +
          2.0 * complexBranchScore + 100.0 * memoryErrorEvents +
          static_cast<double>(depth);

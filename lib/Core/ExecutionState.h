@@ -255,7 +255,7 @@ public:
   using base_mo_t = std::map<uint64_t, std::set<ref<Expr>>>;
   base_mo_t base_mos;
 
-  /// @brief Heuristic metadata for risk-based search strategies.
+  /// @brief Heuristic metadata for risk-based search strategies
   double riskScore = 0.0;
   std::uint64_t symbolicMemoryAccesses = 0;
   std::uint64_t symbolicPointerUses = 0;

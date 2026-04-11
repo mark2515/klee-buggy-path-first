@@ -123,7 +123,7 @@ namespace klee {
     void printName(llvm::raw_ostream &os) override;
   };
 
-  /// BuggyPathFirstSearcher prioritizes states with higher risk scores.
+  /// BuggyPathFirstSearcher prioritizes states with higher risk scores
   class BuggyPathFirstSearcher final : public Searcher {
     struct QueueEntry {
       double riskScore;
