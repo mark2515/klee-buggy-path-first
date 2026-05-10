@@ -1,0 +1,5 @@
+Error: external call with symbolic argument: printf
+Stack: 
+	#000000323 in printIntLine(x=symbolic)
+	#100000277 in benchmark_bad()
+	#200000347 in main()

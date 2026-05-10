@@ -1,0 +1,30 @@
+array a[4] : w32 -> w8 = symbolic
+array a_1[4] : w32 -> w8 = symbolic
+array b_1[4] : w32 -> w8 = symbolic
+array c_1[4] : w32 -> w8 = symbolic
+array d[4] : w32 -> w8 = symbolic
+array d_1[4] : w32 -> w8 = symbolic
+(query [(Eq false
+             (Sle 0
+                  (ReadLSB w32 0 a)))
+         (Sle 0
+              N0:(ReadLSB w32 0 d))
+         (Eq false (Slt N0 4))
+         (Eq false
+             (Slt 4294967276
+                  (ReadLSB w32 0 a_1)))
+         (Sle 0
+              N1:(ReadLSB w32 0 d_1))
+         (Slt N1 4)
+         (Slt 5
+              N2:(ReadLSB w32 0 b_1))
+         (Sle 0
+              N3:(Sub w32 (Add w32 N2
+                                   (ReadLSB w32 0 c_1))
+                          N1))
+         (Slt N3 4)
+         (Eq false
+             (Ult (Add w64 (Mul w64 4 (SExt w64 N1))
+                           (Mul w64 4 (SExt w64 N3)))
+                  13))]
+        false)

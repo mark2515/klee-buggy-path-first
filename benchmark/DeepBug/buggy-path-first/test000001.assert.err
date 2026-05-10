@@ -1,0 +1,3 @@
+Error: ASSERTION FAIL: 0
+Stack: 
+	#000000065 in main()

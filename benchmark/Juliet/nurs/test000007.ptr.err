@@ -1,0 +1,16 @@
+Error: memory error: out of bound pointer
+Stack: 
+	#000000274 in benchmark_bad()
+	#100000347 in main()
+Info: 
+	address: (Add w64 139506854821888
+          (Add w64 (Mul w64 4
+                            (SExt w64 N0:(ReadLSB w32 0 d_1)))
+                   (Mul w64 4
+                            (SExt w64 (Sub w32 (Add w32 (ReadLSB w32 0 b_1)
+                                                        (ReadLSB w32 0 c_1))
+                                               N0)))))
+	example: 139498331865624
+	range: [139498264887296, 139506854821884]
+	next: object at 139487795904512 of size 4
+		MO844[4] allocated at benchmark_bad():  %val43 = alloca i32, align 4

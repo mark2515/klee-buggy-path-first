@@ -1,0 +1,4 @@
+Error: ASSERTION FAIL: 0
+Stack: 
+	#000000278 in benchmark_bad()
+	#100000347 in main()

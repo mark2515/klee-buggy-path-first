@@ -1,0 +1,14 @@
+Error: memory error: out of bound pointer
+Stack: 
+	#000000121 in main()
+Info: 
+	address: (Add w64 139856894656512
+          (Mul w64 4
+                   (SExt w64 (SRem w32 (Add w32 (Add w32 (ReadLSB w32 0 a)
+                                                         (ReadLSB w32 0 b))
+                                                (ReadLSB w32 0 c))
+                                       20))))
+	example: 139856894656480
+	range: [139856894656436, 139856894656508]
+	next: object at 139488601210880 of size 4
+		MO21[4] allocated at main():  %c = alloca i32, align 4

@@ -151,6 +151,62 @@ void RandomSearcher::printName(llvm::raw_ostream &os) {
 
 ///
 
+void BuggyPathFirstSearcher::pushOrRefresh(ExecutionState &state) {
+  activeStates.insert(&state);
+  const auto generation = ++generations[&state];
+  states.push({state.getRiskScore(), generation, &state});
+}
+
+void BuggyPathFirstSearcher::discardStaleEntries() {
+  while (!states.empty()) {
+    const auto &entry = states.top();
+    auto activeIt = activeStates.find(entry.state);
+    auto generationIt = generations.find(entry.state);
+    if (activeIt != activeStates.end() && generationIt != generations.end() &&
+        generationIt->second == entry.generation) {
+      break;
+    }
+    states.pop();
+  }
+}
+
+ExecutionState &BuggyPathFirstSearcher::selectState() {
+  discardStaleEntries();
+  assert(!states.empty() && "buggy-path-first searcher is empty");
+  return *states.top().state;
+}
+
+void BuggyPathFirstSearcher::update(
+    ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
+    const std::vector<ExecutionState *> &removedStates) {
+  for (const auto state : removedStates) {
+    activeStates.erase(state);
+    generations.erase(state);
+  }
+
+  if (current &&
+      std::find(removedStates.begin(), removedStates.end(), current) ==
+          removedStates.end()) {
+    pushOrRefresh(*current);
+  }
+
+  for (const auto state : addedStates) {
+    pushOrRefresh(*state);
+  }
+}
+
+bool BuggyPathFirstSearcher::empty() {
+  discardStaleEntries();
+  return activeStates.empty();
+}
+
+void BuggyPathFirstSearcher::printName(llvm::raw_ostream &os) {
+  os << "BuggyPathFirstSearcher\n";
+}
+
+
+///
+
 WeightedRandomSearcher::WeightedRandomSearcher(WeightType type, RNG &rng)
   : states(std::make_unique<DiscretePDF<ExecutionState*, ExecutionStateIDCompare>>()),
     theRNG{rng},

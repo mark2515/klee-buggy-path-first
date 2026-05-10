@@ -37,6 +37,8 @@ cl::list<Searcher::CoreSearchType> CoreSearch(
                    "randomly select a state to explore"),
         clEnumValN(Searcher::RandomPath, "random-path",
                    "use Random Path Selection (see OSDI'08 paper)"),
+        clEnumValN(Searcher::BuggyPathFirst, "buggy-path-first",
+                   "prioritize states with higher bug-risk scores"),
         clEnumValN(Searcher::NURS_CovNew, "nurs:covnew",
                    "use Non Uniform Random Search (NURS) with Coverage-New"),
         clEnumValN(Searcher::NURS_MD2U, "nurs:md2u",
@@ -114,6 +116,7 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, RNG &rng,
     case Searcher::BFS: searcher = new BFSSearcher(); break;
     case Searcher::RandomState: searcher = new RandomSearcher(rng); break;
     case Searcher::RandomPath: searcher = new RandomPathSearcher(executionTree, rng); break;
+    case Searcher::BuggyPathFirst: searcher = new BuggyPathFirstSearcher(); break;
     case Searcher::NURS_CovNew: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::CoveringNew, rng); break;
     case Searcher::NURS_MD2U: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::MinDistToUncovered, rng); break;
     case Searcher::NURS_Depth: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::Depth, rng); break;

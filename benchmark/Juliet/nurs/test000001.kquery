@@ -1,0 +1,16 @@
+array a[4] : w32 -> w8 = symbolic
+array b[4] : w32 -> w8 = symbolic
+array c[4] : w32 -> w8 = symbolic
+array d[4] : w32 -> w8 = symbolic
+(query [(Eq false
+             (Sle 0
+                  (ReadLSB w32 0 a)))
+         (Sle 0
+              N0:(ReadLSB w32 0 d))
+         (Slt N0 4)
+         (Sle 0
+              N1:(Sub w32 (Add w32 (ReadLSB w32 0 b)
+                                   (ReadLSB w32 0 c))
+                          N0))
+         (Slt N1 4)]
+        false)

@@ -95,10 +95,44 @@
 #include <string>
 #include <sys/mman.h>
 #include <sys/resource.h>
+#include <unordered_set>
 #include <vector>
 
 using namespace llvm;
 using namespace klee;
+
+namespace {
+unsigned computeExprNodeCount(const ref<Expr> &expr) {
+  std::vector<ref<Expr>> worklist{expr};
+  std::unordered_set<const Expr *> seen;
+  unsigned nodes = 0;
+
+  while (!worklist.empty()) {
+    ref<Expr> current = worklist.back();
+    worklist.pop_back();
+
+    const Expr *exprPtr = current.get();
+    if (!seen.insert(exprPtr).second)
+      continue;
+
+    ++nodes;
+    for (unsigned i = 0; i < current->getNumKids(); ++i) {
+      worklist.push_back(current->getKid(i));
+    }
+  }
+
+  return nodes;
+}
+
+void noteBranchRisk(ExecutionState &state, const ref<Expr> &condition) {
+  if (isa<klee::ConstantExpr>(condition))
+    return;
+
+  const unsigned nodeCount = computeExprNodeCount(condition);
+  if (nodeCount > 4)
+    state.noteComplexBranch(nodeCount - 4);
+}
+} // namespace
 
 namespace klee {
 cl::OptionCategory DebugCat("Debugging options",
@@ -485,6 +519,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
       pathWriter(0), symPathWriter(0), specialFunctionHandler(0), timers{time::Span(TimerInterval)},
       replayKTest(0), replayPath(0), usingSeeds(0),
       atMemoryLimit(false), inhibitForking(false), haltExecution(false),
+      executionStartTime(time::getWallTime()), firstBugTimeReported(false),
       ivcEnabled(false), debugLogBuffer(debugBufferString) {
 
 
@@ -903,6 +938,9 @@ void Executor::branch(ExecutionState &state,
   unsigned N = conditions.size();
   assert(N);
 
+  for (const auto &condition : conditions)
+    noteBranchRisk(state, condition);
+
   if (!branchingPermitted(state)) {
     unsigned next = theRNG.getInt32() % N;
     for (unsigned i=0; i<N; ++i) {
@@ -978,6 +1016,10 @@ void Executor::branch(ExecutionState &state,
   for (unsigned i=0; i<N; ++i)
     if (result[i])
       addConstraint(*result[i], conditions[i]);
+
+  state.refreshRiskScore();
+  for (auto *branchedState : addedStates)
+    branchedState->refreshRiskScore();
 }
 
 ref<Expr> Executor::maxStaticPctChecks(ExecutionState &current,
@@ -1038,6 +1080,8 @@ ref<Expr> Executor::maxStaticPctChecks(ExecutionState &current,
 
 Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
                                    bool isInternal, BranchType reason) {
+  noteBranchRisk(current, condition);
+
   Solver::Validity res;
   std::map< ExecutionState*, std::vector<SeedInfo> >::iterator it = 
     seedMap.find(&current);
@@ -1217,6 +1261,8 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
 
     addConstraint(*trueState, condition);
     addConstraint(*falseState, Expr::createIsZero(condition));
+    trueState->refreshRiskScore();
+    falseState->refreshRiskScore();
 
     // Kinda gross, do we even really still want this option?
     if (MaxDepth && MaxDepth<=trueState->depth) {
@@ -2512,6 +2558,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       executeCall(state, ki, f, arguments);
     } else {
       ref<Expr> v = eval(ki, 0, state).value;
+      if (!isa<ConstantExpr>(v))
+        state.noteSymbolicPointerUse();
 
       ExecutionState *free = &state;
       bool hasInvalid = false, first = true;
@@ -3396,6 +3444,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 }
 
 void Executor::updateStates(ExecutionState *current) {
+  if (current)
+    current->refreshRiskScore();
+  for (auto *addedState : addedStates)
+    addedState->refreshRiskScore();
+
   if (searcher) {
     searcher->update(current, addedStates, removedStates);
   }
@@ -3589,19 +3642,14 @@ bool Executor::checkMemoryUsage() {
 }
 
 void Executor::doDumpStates() {
-  if (states.empty())
+  if (!DumpStatesOnHalt || states.empty()) {
+    interpreterHandler->incPathsExplored(states.size());
     return;
+  }
 
-  if (DumpStatesOnHalt)
-    klee_message("halting execution, dumping remaining states");
-
-  for (ExecutionState *state : states)
-    if (DumpStatesOnHalt)
-      terminateStateEarly(*state, "Execution halting.",
-                          StateTerminationType::Interrupted);
-    else
-      terminateState(*state, StateTerminationType::Interrupted);
-
+  klee_message("halting execution, dumping remaining states");
+  for (const auto &state : states)
+    terminateStateEarly(*state, "Execution halting.", StateTerminationType::Interrupted);
   updateStates(nullptr);
 }
 
@@ -3905,6 +3953,20 @@ void Executor::terminateStateOnError(ExecutionState &state,
   Instruction * lastInst;
   const InstructionInfo &ii = getLastNonKleeInternalInstruction(state, &lastInst);
 
+  if (!firstBugTimeReported) {
+    const time::Span elapsed =
+        statsTracker ? statsTracker->elapsed()
+                     : (time::getWallTime() - executionStartTime);
+  
+    std::ostringstream elapsedStream;
+    elapsedStream << std::fixed << std::setprecision(3)
+                  << elapsed.toSeconds() << 's';
+    const std::string elapsedString = elapsedStream.str();
+  
+    klee_message("First bug found after %s", elapsedString.c_str());
+    firstBugTimeReported = true;
+  }
+
   if (EmitAllErrors ||
       emittedErrors.insert(std::make_pair(lastInst, message)).second) {
     if (!ii.file.empty()) {
@@ -3959,6 +4021,11 @@ void Executor::terminateStateOnProgramError(ExecutionState &state,
                                             const char *suffix) {
   assert(reason > StateTerminationType::SOLVERERR &&
          reason <= StateTerminationType::PROGERR);
+  if (reason == StateTerminationType::Ptr ||
+      reason == StateTerminationType::ReadOnly ||
+      reason == StateTerminationType::Free) {
+    state.noteMemoryError();
+  }
   ++stats::terminationProgramError;
   terminateStateOnError(state, message, reason, info, suffix);
 }
@@ -4372,6 +4439,8 @@ void Executor::resolveExact(ExecutionState &state,
                             ExactResolutionList &results, 
                             const std::string &name) {
   p = optimizer.optimizeExpr(p, true);
+  if (!isa<ConstantExpr>(p))
+    state.noteSymbolicPointerUse();
   // XXX we may want to be capping this?
   ResolutionList rl;
   state.addressSpace.resolve(state, solver.get(), p, rl);
@@ -4429,6 +4498,10 @@ void Executor::executeMemoryOperation(ExecutionState &state,
   }
 
   address = optimizer.optimizeExpr(address, true);
+  if (!isa<ConstantExpr>(address)) {
+    state.noteSymbolicPointerUse();
+    state.noteSymbolicMemoryAccess();
+  }
 
   ObjectPair op;
   bool success;
@@ -4779,7 +4852,7 @@ void Executor::runFunctionAsMain(Function *f,
   executionTree = nullptr;
 
   // hack to clear memory objects
-  memory = std::make_unique<MemoryManager>(&arrayCache);
+  memory = nullptr;
 
   globalObjects.clear();
   globalAddresses.clear();
